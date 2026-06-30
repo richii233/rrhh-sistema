@@ -1,4 +1,5 @@
 import { supabase } from "../supabase-client.js";
+console.log("script.js cargado");
 const db = supabase;
 let modoDemo = false;
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
