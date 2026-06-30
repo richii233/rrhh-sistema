@@ -44,18 +44,66 @@ function diasEntre(iso1, iso2) {
 // CONEXIÓN A SUPABASE
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 async function iniciar() {
-  // Probar conexión
-  const { error } = await db.from('candidatos').select('id').limit(1);
-  const dot = document.getElementById('status-dot');
-  const txt = document.getElementById('status-text');
-  const statusEl = document.getElementById('db-status');
 
-  if (error) {
-    // Usar datos demo si no hay Supabase configurado
-    modoDemo = true;
-  } else {
-    modoDemo = false;
-  }
+    console.log("1. Entró a iniciar");
+
+    try {
+
+        console.log("2. Consultando candidatos...");
+
+        const { data, error } = await db
+            .from("candidatos")
+            .select("id")
+            .limit(1);
+
+        console.log("3. Resultado:", data);
+        console.log("4. Error:", error);
+
+        const dot = document.getElementById('status-dot');
+        const txt = document.getElementById('status-text');
+        const statusEl = document.getElementById('db-status');
+
+        console.log("5. Elementos HTML", dot, txt, statusEl);
+
+        if (error) {
+
+            console.log("6. Entró al modo demo");
+
+            modoDemo = true;
+
+            dot.style.background = '#F59E0B';
+            txt.textContent = 'Modo demo';
+
+            candidatos = datosDemo();
+
+            renderizarTodo();
+
+            return;
+        }
+
+        console.log("7. Conectado correctamente");
+
+        modoDemo = false;
+
+        dot.style.background = '#22C55E';
+        txt.textContent = 'Conectado';
+
+        await cargarCandidatos();
+
+        console.log("8. cargarCandidatos terminó");
+
+        suscribirRealtime();
+
+        console.log("9. Realtime iniciado");
+
+        setTimeout(() => statusEl.classList.add("hidden"), 2000);
+
+    } catch (e) {
+
+        console.error("ERROR EN INICIAR", e);
+
+    }
+
 }
 
 async function cargarCandidatos() {
@@ -515,68 +563,7 @@ function esDemo() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // ARRANCAR
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-async function iniciar() {
-
-    console.log("1. Entró a iniciar");
-
-    try {
-
-        console.log("2. Consultando candidatos...");
-
-        const { data, error } = await db
-            .from("candidatos")
-            .select("id")
-            .limit(1);
-
-        console.log("3. Resultado:", data);
-        console.log("4. Error:", error);
-
-        const dot = document.getElementById('status-dot');
-        const txt = document.getElementById('status-text');
-        const statusEl = document.getElementById('db-status');
-
-        console.log("5. Elementos HTML", dot, txt, statusEl);
-
-        if (error) {
-
-            console.log("6. Entró al modo demo");
-
-            modoDemo = true;
-
-            dot.style.background = '#F59E0B';
-            txt.textContent = 'Modo demo';
-
-            candidatos = datosDemo();
-
-            renderizarTodo();
-
-            return;
-        }
-
-        console.log("7. Conectado correctamente");
-
-        modoDemo = false;
-
-        dot.style.background = '#22C55E';
-        txt.textContent = 'Conectado';
-
-        await cargarCandidatos();
-
-        console.log("8. cargarCandidatos terminó");
-
-        suscribirRealtime();
-
-        console.log("9. Realtime iniciado");
-
-        setTimeout(() => statusEl.classList.add("hidden"), 2000);
-
-    } catch (e) {
-
-        console.error("ERROR EN INICIAR", e);
-
-    }
-
-}
+iniciar();
 // Hacer visibles las funciones para los onclick del HTML
 window.guardar = guardar;
 window.abrirNuevo = abrirNuevo;
