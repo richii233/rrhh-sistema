@@ -515,7 +515,28 @@ function esDemo() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // ARRANCAR
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-iniciar();
+async function iniciar() {
+
+    console.log("Entró a iniciar()");
+
+    try {
+
+        console.log("Probando Supabase...");
+
+        const { data, error } = await db
+            .from("candidatos")
+            .select("id")
+            .limit(1);
+
+        console.log("Respuesta:", data, error);
+
+    } catch (e) {
+
+        console.error("ERROR:", e);
+
+    }
+
+}
 // Hacer visibles las funciones para los onclick del HTML
 window.guardar = guardar;
 window.abrirNuevo = abrirNuevo;
