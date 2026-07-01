@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Módulo 5 — Salida · RRHH Sistema</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.2.0/dist/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+/* ═══ RESET ═══ */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#F1F5F9;--surface:#fff;--border:#E2E8F0;--border-l:#F1F5F9;
+  --text:#1E293B;--text2:#374151;--text3:#64748B;--text4:#94A3B8;
+  --sidebar:#0F172A;--blue:#2563EB;--blue-h:#1D4ED8;
+  --green:#16A34A;--green-h:#15803D;--red:#DC2626;
+  --radius:10px;--shadow:0 1px 3px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.04);
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+
+/* ═══ LAYOUT ═══ */
+.app{display:flex;height:100vh;overflow:hidden}
+.sidebar{width:220px;background:var(--sidebar);flex-shrink:0;display:flex;flex-direction:column;overflow-y:auto}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.content{flex:1;overflow-y:auto;padding:20px 24px}
+
+/* ═══ SIDEBAR ═══ */
+.logo{padding:20px 16px 16px;border-bottom:1px solid rgba(255,255,255,.07)}
+.logo-mark{font-size:13px;font-weight:600;color:#fff;display:flex;align-items:center;gap:6px}
+.logo-sub{font-size:11px;color:rgba(255,255,255,.35);margin-top:2px}
+.nav-section{padding:12px 0 4px}
+.nav-label{padding:6px 16px;font-size:10px;font-weight:600;color:rgba(255,255,255,.3);letter-spacing:1px;text-transform:uppercase}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;color:rgba(255,255,255,.55);font-size:13px;transition:all .12s;border-left:2px solid transparent;text-decoration:none}
+.nav-item:hover{background:rgba(255,255,255,.05);color:rgba(255,255,255,.85)}
+.nav-item.active{background:rgba(255,255,255,.08);color:#fff;border-left-color:var(--blue)}
+.nav-item i{font-size:16px;width:18px}
+.nav-badge{margin-left:auto;background:rgba(239,68,68,.35);color:#FCA5A5;font-size:10px;padding:1px 6px;border-radius:99px}
+.sb-footer{margin-top:auto;padding:14px 16px;border-top:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:10px}
+.user-av{width:30px;height:30px;border-radius:50%;background:#6366F1;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;flex-shrink:0}
+.user-name{font-size:12px;color:rgba(255,255,255,.85);font-weight:500}
+.user-role{font-size:10px;color:rgba(255,255,255,.35)}
+
+/* ═══ TOPBAR ═══ */
+.topbar{background:#fff;border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:52px;flex-shrink:0}
+.topbar-l{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text3)}
+.page-title{color:var(--text);font-weight:500;font-size:15px}
+.topbar-r{display:flex;align-items:center;gap:12px}
+.search-wrap{display:flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--border);border-radius:8px;background:#fff}
+.search-wrap input{border:none;outline:none;font-size:13px;color:var(--text2);width:180px;background:transparent;font-family:inherit}
+.icon-btn{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text3);font-size:16px;position:relative}
+.icon-btn:hover{background:#F8FAFC}
+.av-top{width:32px;height:32px;border-radius:50%;background:#6366F1;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff}
+
+/* ═══ STATS ═══ */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.stat-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow)}
+.stat-label{font-size:11px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.stat-val{font-size:26px;font-weight:600;color:var(--text);line-height:1}
+.stat-sub{font-size:11px;color:var(--text4);margin-top:4px}
+
+/* ═══ CARDS / ROW ═══ */
+.row{display:grid;grid-template-columns:1.3fr 1fr;gap:14px}
+.card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow)}
+.card-mb{margin-bottom:14px}
+.card-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:8px;flex-wrap:wrap}
+.card-title{font-size:14px;font-weight:600;color:var(--text)}
+
+/* ═══ TABLE ═══ */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:9px 12px;font-size:11px;font-weight:600;color:var(--text3);border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
+td{padding:9px 12px;border-bottom:1px solid var(--border-l);color:var(--text2);vertical-align:middle;font-size:13px}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#FAFBFD}
+.empty-row td{text-align:center;padding:28px;color:var(--text4);font-size:13px}
+
+/* ═══ AVATAR ═══ */
+.av{width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;flex-shrink:0}
+.av-xl{width:52px;height:52px;font-size:17px}
+
+/* ═══ BADGES ═══ */
+.badge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:500;white-space:nowrap}
+.b-gray{background:#F1F5F9;color:#475569}
+.b-blue{background:#EFF6FF;color:#1D4ED8}
+.b-yellow{background:#FFFBEB;color:#92400E}
+.b-purple{background:#F5F3FF;color:#5B21B6}
+.b-green{background:#F0FDF4;color:#15803D}
+.b-red{background:#FEF2F2;color:#B91C1C}
+.b-orange{background:#FFF7ED;color:#C2410C}
+
+/* ═══ BUTTONS ═══ */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border-radius:8px;border:1px solid var(--border);background:#fff;color:var(--text2);font-size:13px;cursor:pointer;font-weight:500;transition:all .12s;white-space:nowrap;font-family:inherit}
+.btn:hover{background:#F8FAFC;border-color:#CBD5E1}
+.btn-sm{padding:5px 10px;font-size:12px;border-radius:6px}
+.btn-primary{background:var(--blue);color:#fff;border-color:var(--blue)}
+.btn-primary:hover{background:var(--blue-h);border-color:var(--blue-h)}
+.btn-blue-o{color:var(--blue);border-color:#BFDBFE;background:#fff}
+.btn-blue-o:hover{background:#EFF6FF}
+.btn-danger{color:var(--red);border-color:#FECACA;background:#fff}
+.btn-danger:hover{background:#FEF2F2}
+.btn-warn{color:#D97706;border-color:#FDE68A;background:#fff}
+.btn-warn:hover{background:#FFFBEB}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* ═══ MODALS ═══ */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:#fff;border-radius:12px;border:1px solid var(--border);padding:22px;width:580px;max-height:92vh;overflow-y:auto;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.15);animation:slideUp .15s}
+.modal-wide{width:700px}
+.modal-sm{width:400px}
+@keyframes slideUp{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-title{font-size:16px;font-weight:600;color:var(--text);margin-bottom:18px}
+.modal-close{position:absolute;top:14px;right:14px;width:28px;height:28px;border-radius:8px;border:1px solid var(--border);background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text3);font-size:14px}
+.modal-close:hover{background:#F8FAFC}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;padding-top:14px;border-top:1px solid var(--border-l)}
+
+/* ═══ FORMS ═══ */
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-group{margin-bottom:12px}
+.form-label{display:block;font-size:12px;font-weight:500;color:var(--text2);margin-bottom:5px}
+.req{color:var(--red)}
+.form-control{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text);background:#fff;outline:none;transition:border-color .12s;font-family:inherit}
+.form-control:focus{border-color:#93C5FD;box-shadow:0 0 0 3px rgba(147,197,253,.2)}
+select.form-control{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394A3B8'%3E%3Cpath stroke-linecap='round' stroke-width='2' d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;background-size:16px;padding-right:30px}
+textarea.form-control{resize:vertical;min-height:72px}
+.section-hd{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin:16px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border-l)}
+
+/* ═══ CHECKLIST ═══ */
+.checklist{display:flex;flex-direction:column;gap:6px}
+.check-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:all .12s;user-select:none}
+.check-item:hover{border-color:#93C5FD;background:#F8FAFC}
+.check-item.done{background:#F0FDF4;border-color:#BBF7D0}
+.check-item.done .ck-lbl{color:#15803D;text-decoration:line-through}
+.ck-box{width:18px;height:18px;border:2px solid var(--border);border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .12s;font-size:12px;color:transparent}
+.check-item.done .ck-box{background:#16A34A;border-color:#16A34A;color:#fff}
+.ck-lbl{font-size:13px;color:var(--text2);font-weight:500;flex:1}
+.ck-cat{font-size:10px;color:var(--text4);margin-left:auto}
+
+/* ═══ PROGRESS ═══ */
+.prog-wrap{width:100%;height:8px;background:#F1F5F9;border-radius:99px;overflow:hidden;margin-bottom:6px}
+.prog-bar{height:100%;border-radius:99px;background:var(--blue);transition:width .4s}
+.prog-bar.done{background:var(--green)}
+
+/* ═══ ENTREVISTA ═══ */
+.pregunta-item{padding:10px 0;border-bottom:1px solid var(--border-l)}
+.pregunta-item:last-child{border-bottom:none}
+.pregunta-lbl{font-size:13px;font-weight:500;color:var(--text2);margin-bottom:6px}
+.pregunta-ctrl{display:flex;gap:4px;flex-wrap:wrap}
+.resp-btn{padding:5px 12px;border:1px solid var(--border);border-radius:99px;font-size:12px;cursor:pointer;color:var(--text3);background:#fff;transition:all .12s}
+.resp-btn.selected{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+/* ═══ TOAST ═══ */
+#toast-wrap{position:fixed;bottom:20px;right:20px;z-index:300;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{background:#1E293B;color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;display:flex;align-items:center;gap:8px;opacity:0;transform:translateY(8px);transition:all .25s;max-width:320px}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.ok{background:#15803D}
+.toast.err{background:#B91C1C}
+
+/* ═══ STATUS ═══ */
+#db-status{position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#fff;border:1px solid var(--border);border-radius:99px;padding:4px 12px;font-size:11px;display:flex;align-items:center;gap:6px;box-shadow:var(--shadow);z-index:50;transition:opacity .5s}
+#db-status.hidden{opacity:0;pointer-events:none}
+.sdot{width:7px;height:7px;border-radius:50%}
+.spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;margin:28px auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ═══ FILTER CHIPS ═══ */
+.filter-row{display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.filter-lbl{font-size:12px;color:var(--text3)}
+.chip{padding:5px 12px;border-radius:99px;border:1px solid var(--border);background:#fff;font-size:12px;cursor:pointer;color:var(--text3);font-weight:500;transition:all .12s}
+.chip:hover{border-color:#93C5FD;color:var(--blue)}
+.chip.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+/* ═══ CONFIRM ═══ */
+.confirm-icon{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;margin:0 auto 14px}
+.confirm-title{font-size:15px;font-weight:600;text-align:center;margin-bottom:6px}
+.confirm-body{font-size:13px;color:var(--text3);text-align:center;line-height:1.5}
+
+/* ═══ TABS ═══ */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:14px}
+.tab{padding:8px 16px;font-size:13px;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;font-weight:500;transition:all .12s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--blue);border-bottom-color:var(--blue)}
+
+/* ═══ RESPONSIVE ═══ */
+@media(max-width:1100px){
+  .row{grid-template-columns:1fr}
+  .stats-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:900px){
+  .sidebar{width:56px}
+  .logo-mark span,.logo-sub,.nav-item span,.user-info,.nav-label,.nav-badge{display:none}
+  .nav-item{justify-content:center;padding:10px}
+}
+</style>
+</head>
+<body>
+
+<div id="db-status">
+  <div class="sdot" id="sdot" style="background:#F59E0B"></div>
+  <span id="stxt">Conectando...</span>
+</div>
+
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="logo">
+      <div class="logo-mark"><i class="ti ti-building-community"></i><span>RRHH Sistema</span></div>
+      <div class="logo-sub">Gestión de Talento Humano</div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Módulos</div>
+      <a class="nav-item" href="../modulo1-reclutamiento/index.html"><i class="ti ti-user-search"></i><span>Reclutamiento</span></a>
+      <a class="nav-item" href="../modulo2-personal/index.html"><i class="ti ti-users"></i><span>Personal</span></a>
+      <a class="nav-item" href="../modulo3-control/index.html"><i class="ti ti-clock-check"></i><span>Control Diario</span></a>
+      <a class="nav-item" href="../modulo4-desarrollo/index.html"><i class="ti ti-school"></i><span>Desarrollo</span></a>
+      <div class="nav-item active"><i class="ti ti-door-exit"></i><span>Salida</span><span class="nav-badge" id="badge-salida">—</span></div>
+      <a class="nav-item" href="../modulo6-reportes/index.html"><i class="ti ti-chart-bar"></i><span>Reportes</span></a>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Sistema</div>
+      <div class="nav-item"><i class="ti ti-settings"></i><span>Configuración</span></div>
+      <div class="nav-item"><i class="ti ti-help-circle"></i><span>Ayuda</span></div>
+    </div>
+    <div class="sb-footer">
+      <div class="user-av">AG</div>
+      <div class="user-info">
+        <div class="user-name">Ana García</div>
+        <div class="user-role">Gerente RRHH</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-l">
+        <i class="ti ti-home" style="font-size:14px"></i>
+        <span style="color:#CBD5E1">/</span>
+        <span class="page-title">Salida</span>
+      </div>
+      <div class="topbar-r">
+        <div class="search-wrap">
+          <i class="ti ti-search" style="font-size:14px;color:var(--text3)"></i>
+          <input id="search-input" placeholder="Buscar proceso..." oninput="renderTabla()">
+        </div>
+        <div class="icon-btn"><i class="ti ti-bell"></i></div>
+        <div class="av-top">AG</div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- STATS -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Procesos activos</div>
+          <div class="stat-val" id="st-activos">—</div>
+          <div class="stat-sub">en curso de offboarding</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Completados este año</div>
+          <div class="stat-val" id="st-completados">—</div>
+          <div class="stat-sub" id="st-comp-tipos">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Motivo más frecuente</div>
+          <div class="stat-val" style="font-size:16px;margin-top:2px" id="st-motivo">—</div>
+          <div class="stat-sub" id="st-motivo-pct">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Pendientes de acción</div>
+          <div class="stat-val" id="st-pendientes">—</div>
+          <div class="stat-sub">checklists incompletos</div>
+        </div>
+      </div>
+
+      <div class="row">
+
+        <!-- COL IZQUIERDA: TABLA DE PROCESOS -->
+        <div class="card" style="display:flex;flex-direction:column">
+          <div class="card-hd">
+            <div class="card-title">Procesos de desvinculación</div>
+            <button class="btn btn-primary btn-sm" onclick="abrirNuevo()">
+              <i class="ti ti-plus"></i>Nuevo proceso
+            </button>
+          </div>
+          <div class="filter-row" id="filter-row">
+            <span class="filter-lbl">Estado:</span>
+            <div class="chip active" onclick="filtrarPor('todos',this)">Todos</div>
+            <div class="chip" onclick="filtrarPor('En proceso',this)">En proceso</div>
+            <div class="chip" onclick="filtrarPor('Completado',this)">Completados</div>
+          </div>
+          <div class="tbl-wrap" style="flex:1">
+            <table>
+              <thead>
+                <tr>
+                  <th>Empleado</th>
+                  <th>Motivo</th>
+                  <th>Fecha salida</th>
+                  <th>Progreso</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="tbody"><tr><td colspan="5"><div class="spinner"></div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- COL DERECHA -->
+        <div>
+          <!-- DETALLE PROCESO -->
+          <div class="card card-mb">
+            <div id="detalle-content">
+              <div style="text-align:center;padding:24px;color:var(--text4)">
+                <i class="ti ti-door-exit" style="font-size:32px;display:block;margin-bottom:8px"></i>
+                Selecciona un proceso para ver el detalle y checklist
+              </div>
+            </div>
+          </div>
+
+          <!-- RESUMEN MOTIVOS -->
+          <div class="card">
+            <div class="card-hd">
+              <div class="card-title">Distribución por motivo</div>
+            </div>
+            <div id="motivos-wrap">
+              <div class="spinner"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /content -->
+  </div>
+</div>
+
+<!-- ══ MODAL: NUEVO PROCESO ══ -->
+<div class="overlay" id="modal-nuevo">
+  <div class="modal modal-wide">
+    <button class="modal-close" onclick="cerrarModal('modal-nuevo')"><i class="ti ti-x"></i></button>
+    <div class="modal-title">Iniciar proceso de desvinculación</div>
+
+    <div class="section-hd" style="margin-top:0">Datos del empleado</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Empleado <span class="req">*</span></label>
+        <select class="form-control" id="f-empleado"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Fecha de último día <span class="req">*</span></label>
+        <input class="form-control" id="f-fecha" type="date">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Tipo de salida <span class="req">*</span></label>
+        <select class="form-control" id="f-tipo">
+          <option>Renuncia voluntaria</option>
+          <option>Despido con causa</option>
+          <option>Despido sin causa</option>
+          <option>Jubilación</option>
+          <option>Fin de contrato</option>
+          <option>Mutuo acuerdo</option>
+          <option>Fallecimiento</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Responsable RRHH</label>
+        <input class="form-control" id="f-responsable" value="Ana García">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Observaciones</label>
+      <textarea class="form-control" id="f-obs" placeholder="Detalles relevantes del proceso de salida..."></textarea>
+    </div>
+
+    <div class="section-hd">Entrevista de salida</div>
+    <div id="entrevista-preguntas"></div>
+
+    <div class="modal-footer">
+      <button class="btn" onclick="cerrarModal('modal-nuevo')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-guardar" onclick="guardar()"><i class="ti ti-check"></i>Iniciar proceso</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: CHECKLIST ══ -->
+<div class="overlay" id="modal-check">
+  <div class="modal">
+    <button class="modal-close" onclick="cerrarModal('modal-check')"><i class="ti ti-x"></i></button>
+    <div class="modal-title" id="check-titulo">Checklist de offboarding</div>
+    <div class="prog-wrap"><div class="prog-bar" id="check-prog" style="width:0%"></div></div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:14px" id="check-pct">0 de 0 pasos completados</div>
+    <div class="checklist" id="checklist-items"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="cerrarModal('modal-check')">Cerrar</button>
+      <button class="btn btn-primary" id="btn-completar" onclick="completarProceso()" style="display:none">
+        <i class="ti ti-circle-check"></i>Marcar como completado
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: CONFIRMAR COMPLETAR ══ -->
+<div class="overlay" id="modal-confirm">
+  <div class="modal modal-sm">
+    <div class="confirm-icon" style="background:#F0FDF4;color:#15803D"><i class="ti ti-circle-check"></i></div>
+    <div class="confirm-title">¿Finalizar proceso?</div>
+    <div class="confirm-body">Todos los pasos están completados. Se marcará el proceso como finalizado y el empleado pasará a estado Inactivo.</div>
+    <div class="modal-footer" style="justify-content:center;gap:12px">
+      <button class="btn" onclick="cerrarModal('modal-confirm')">Cancelar</button>
+      <button class="btn btn-primary" id="c-ok" onclick="confirmarCompletado()"><i class="ti ti-check"></i>Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-wrap"></div>
+
+<!-- ══════════════ JAVASCRIPT ══════════════ -->
+<script>
+// ── SUPABASE ──
+const SUPABASE_URL = 'https://TU_PROYECTO.supabase.co';
+const SUPABASE_ANON_KEY = 'TU_ANON_KEY';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ── ESTADO ──
+let empleados = [];
+let procesos = [];
+let filtroEstado = 'todos';
+let procesoSeleccionado = null;
+let checklistState = {}; // id_proceso -> { paso_id: bool }
+
+// ── CHECKLIST PLANTILLA ──
+const CHECKLIST = [
+  {id:'docs1',  cat:'Documentación', lbl:'Carta de renuncia / resolución firmada'},
+  {id:'docs2',  cat:'Documentación', lbl:'Cálculo de liquidación revisado y aprobado'},
+  {id:'docs3',  cat:'Documentación', lbl:'Contrato de confidencialidad / no competencia firmado'},
+  {id:'it1',    cat:'TI',            lbl:'Accesos a sistemas revocados'},
+  {id:'it2',    cat:'TI',            lbl:'Correo corporativo desactivado'},
+  {id:'it3',    cat:'TI',            lbl:'Equipos y dispositivos devueltos'},
+  {id:'activ1', cat:'Activos',       lbl:'Tarjeta de acceso / llaves devueltas'},
+  {id:'activ2', cat:'Activos',       lbl:'Carnet y credenciales devueltos'},
+  {id:'activ3', cat:'Activos',       lbl:'Vehículo o herramientas de empresa devueltos'},
+  {id:'fin1',   cat:'Finanzas',      lbl:'Liquidación calculada y aprobada'},
+  {id:'fin2',   cat:'Finanzas',      lbl:'Último sueldo procesado en nómina'},
+  {id:'fin3',   cat:'Finanzas',      lbl:'Descuentos o deducciones aplicados'},
+  {id:'hr1',    cat:'RRHH',          lbl:'Entrevista de salida realizada'},
+  {id:'hr2',    cat:'RRHH',          lbl:'Actualización de expediente en sistema'},
+  {id:'hr3',    cat:'RRHH',          lbl:'Comunicado interno al equipo enviado'},
+];
+
+// ── PREGUNTAS ENTREVISTA ──
+const PREGUNTAS = [
+  {id:'p1', texto:'¿Cuál es el motivo principal de tu salida?', opciones:['Oportunidad laboral','Ambiente de trabajo','Salario','Crecimiento','Personal','Otro']},
+  {id:'p2', texto:'¿Recomendarías la empresa a otros?',         opciones:['Sí','Probablemente sí','Probablemente no','No']},
+  {id:'p3', texto:'¿Cómo calificarías tu relación con tu jefe directo?', opciones:['Excelente','Buena','Regular','Mala']},
+  {id:'p4', texto:'¿Recibiste las herramientas necesarias para tu trabajo?', opciones:['Siempre','Casi siempre','A veces','Nunca']},
+];
+
+// ── HELPERS ──
+const AV_COLORS = ['#8B5CF6','#3B82F6','#EC4899','#0EA5E9','#10B981','#F59E0B','#6366F1','#14B8A6','#EF4444','#F97316'];
+function avColor(id) { return AV_COLORS[(id||0) % AV_COLORS.length]; }
+function iniciales(nombre) { return (nombre||'??').split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase(); }
+function fmtFecha(iso) { if(!iso) return '—'; const d=new Date(iso+'T12:00:00'); return d.toLocaleDateString('es',{day:'2-digit',month:'short',year:'numeric'}); }
+
+function tipoBadge(t) {
+  const m = {'Renuncia voluntaria':'b-blue','Despido con causa':'b-red','Despido sin causa':'b-orange',
+             'Jubilación':'b-purple','Fin de contrato':'b-gray','Mutuo acuerdo':'b-yellow','Fallecimiento':'b-gray'};
+  return `<span class="badge ${m[t]||'b-gray'}">${t}</span>`;
+}
+function estadoBadge(e) {
+  return e==='Completado'
+    ? `<span class="badge b-green">Completado</span>`
+    : `<span class="badge b-yellow">En proceso</span>`;
+}
+
+// ── INICIO ──
+async function iniciar() {
+  document.getElementById('f-fecha').value = new Date().toISOString().split('T')[0];
+  renderEntrevistaForm();
+
+  const { error } = await db.from('empleados').select('id').limit(1);
+  const dot = document.getElementById('sdot');
+  const txt = document.getElementById('stxt');
+  const st  = document.getElementById('db-status');
+  if (error) {
+    dot.style.background = '#F59E0B';
+    txt.textContent = 'Modo demo — configura Supabase para persistencia';
+    setTimeout(()=>st.classList.add('hidden'),4000);
+    cargarDatosDemo();
+    renderizarTodo();
+  } else {
+    dot.style.background = '#22C55E';
+    txt.textContent = 'Conectado a Supabase';
+    setTimeout(()=>st.classList.add('hidden'),2000);
+    await cargar();
+    suscribirRealtime();
+  }
+}
+
+async function cargar() {
+  const [e, p] = await Promise.all([
+    db.from('empleados').select('*'),
+    db.from('procesos_salida').select('*').order('created_at',{ascending:false}),
+  ]);
+  if (e.error) { toast('Error al cargar empleados: '+e.error.message,'err'); return; }
+  empleados = e.data || [];
+  procesos  = (p.data || []).map(parseProceso);
+  renderizarTodo();
+}
+
+function parseProceso(r) {
+  return {
+    ...r,
+    checklist: r.checklist ? (typeof r.checklist==='string' ? JSON.parse(r.checklist) : r.checklist) : {},
+    entrevista: r.entrevista ? (typeof r.entrevista==='string' ? JSON.parse(r.entrevista) : r.entrevista) : {},
+  };
+}
+
+function suscribirRealtime() {
+  db.channel('salida')
+    .on('postgres_changes',{event:'*',schema:'public',table:'procesos_salida'}, ()=>cargar())
+    .subscribe();
+}
+
+// ── DATOS DEMO ──
+function cargarDatosDemo() {
+  empleados = [
+    {id:1,nombre:'Ana García',cargo:'Gerente RRHH',departamento:'RRHH',estado:'Activo'},
+    {id:2,nombre:'Carlos Mora',cargo:'Analista TI',departamento:'TI',estado:'Activo'},
+    {id:3,nombre:'Lucía Pérez',cargo:'Diseñadora',departamento:'Marketing',estado:'Activo'},
+    {id:4,nombre:'Roberto Sánchez',cargo:'Dev Backend',departamento:'TI',estado:'Activo'},
+    {id:5,nombre:'María Jiménez',cargo:'Contadora',departamento:'Finanzas',estado:'Activo'},
+    {id:6,nombre:'Diego Vargas',cargo:'Vendedor',departamento:'Comercial',estado:'Activo'},
+    {id:7,nombre:'Patricia López',cargo:'Asistente RRHH',departamento:'RRHH',estado:'Activo'},
+    {id:8,nombre:'Fernando Ruiz',cargo:'Supervisor',departamento:'Operaciones',estado:'Activo'},
+  ];
+  const ck1 = {docs1:true,docs2:true,docs3:false,it1:true,it2:true,it3:false,activ1:true,activ2:true,activ3:false,fin1:true,fin2:false,fin3:false,hr1:true,hr2:false,hr3:false};
+  const ck2 = Object.fromEntries(CHECKLIST.map(c=>[c.id, true]));
+  procesos = [
+    {id:1, empleado_id:6, empleado_nombre:'Diego Vargas', tipo:'Renuncia voluntaria', fecha_salida:'2026-07-15', estado:'En proceso', responsable:'Ana García', observaciones:'Encontró nueva oportunidad', checklist:ck1, entrevista:{p1:'Oportunidad laboral',p2:'Probablemente sí',p3:'Buena',p4:'Casi siempre'}, created_at:'2026-06-20'},
+    {id:2, empleado_id:3, empleado_nombre:'Lucía Pérez',  tipo:'Fin de contrato',     fecha_salida:'2026-06-30', estado:'Completado',  responsable:'Ana García', observaciones:'Contrato temporal finalizado', checklist:ck2, entrevista:{p1:'Fin de contrato',p2:'Sí',p3:'Excelente',p4:'Siempre'}, created_at:'2026-06-10'},
+  ];
+}
+
+// ── RENDER GENERAL ──
+function renderizarTodo() {
+  actualizarStats();
+  renderTabla();
+  renderMotivos();
+  llenarSelectEmpleado();
+  document.getElementById('badge-salida').textContent = procesos.filter(p=>p.estado==='En proceso').length || '';
+  if (procesoSeleccionado) mostrarDetalle(procesoSeleccionado);
+}
+
+// ── STATS ──
+function actualizarStats() {
+  const activos = procesos.filter(p=>p.estado==='En proceso').length;
+  const anio = new Date().getFullYear();
+  const complAnio = procesos.filter(p=>p.estado==='Completado' && (p.fecha_salida||'').startsWith(anio));
+  const pendientes = procesos.filter(p=>{
+    if (p.estado==='Completado') return false;
+    const check = p.checklist||{};
+    return CHECKLIST.some(c=>!check[c.id]);
+  }).length;
+
+  // Motivo más frecuente
+  const freq = {};
+  procesos.forEach(p=>{ freq[p.tipo]=(freq[p.tipo]||0)+1; });
+  const topMotivo = Object.entries(freq).sort((a,b)=>b[1]-a[1])[0];
+
+  document.getElementById('st-activos').textContent = activos;
+  document.getElementById('st-completados').textContent = complAnio.length;
+  document.getElementById('st-comp-tipos').textContent = `en ${anio}`;
+  document.getElementById('st-motivo').textContent = topMotivo ? topMotivo[0] : '—';
+  document.getElementById('st-motivo-pct').textContent = topMotivo ? `${topMotivo[1]} de ${procesos.length}` : 'Sin datos';
+  document.getElementById('st-pendientes').textContent = pendientes;
+}
+
+// ── TABLA ──
+function renderTabla() {
+  const busqueda = (document.getElementById('search-input').value||'').toLowerCase();
+  const lista = procesos.filter(p => {
+    const matchE = filtroEstado==='todos' || p.estado===filtroEstado;
+    const matchB = !busqueda ||
+      (p.empleado_nombre||'').toLowerCase().includes(busqueda) ||
+      (p.tipo||'').toLowerCase().includes(busqueda);
+    return matchE && matchB;
+  });
+
+  const tbody = document.getElementById('tbody');
+  if (!lista.length) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="5"><i class="ti ti-door-exit" style="font-size:24px;display:block;margin:0 auto 8px;color:#CBD5E1"></i>Sin procesos registrados</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = lista.map(p => {
+    const emp = empleados.find(e=>e.id===p.empleado_id);
+    const col = avColor(p.empleado_id);
+    const ini = iniciales(p.empleado_nombre||'');
+    const check = p.checklist||{};
+    const total = CHECKLIST.length;
+    const done  = CHECKLIST.filter(c=>check[c.id]).length;
+    const pct   = Math.round((done/total)*100);
+    return `<tr onclick="mostrarDetalle(${p.id})" style="cursor:pointer;${procesoSeleccionado===p.id?'background:#EFF6FF':''}">
+      <td>
+        <div style="display:flex;align-items:center;gap:9px">
+          <div class="av" style="background:${col}">${ini}</div>
+          <div>
+            <div style="font-weight:500">${p.empleado_nombre}</div>
+            <div style="font-size:11px;color:var(--text4)">${emp?emp.departamento||'—':'—'}</div>
+          </div>
+        </div>
+      </td>
+      <td>${tipoBadge(p.tipo)}</td>
+      <td>${fmtFecha(p.fecha_salida)}</td>
+      <td style="min-width:120px">
+        <div style="display:flex;align-items:center;gap:7px">
+          <div style="flex:1;height:6px;background:#F1F5F9;border-radius:99px;overflow:hidden">
+            <div style="width:${pct}%;height:100%;border-radius:99px;background:${pct===100?'var(--green)':'var(--blue)'}"></div>
+          </div>
+          <span style="font-size:11px;color:var(--text3);flex-shrink:0">${done}/${total}</span>
+        </div>
+        <div style="font-size:10px;color:var(--text4);margin-top:2px">${estadoBadge(p.estado)}</div>
+      </td>
+      <td>
+        <button class="btn btn-sm btn-blue-o" onclick="event.stopPropagation();abrirChecklist(${p.id})" title="Checklist">
+          <i class="ti ti-checklist"></i>
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function filtrarPor(estado, el) {
+  filtroEstado = estado;
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  renderTabla();
+}
+
+// ── DETALLE ──
+function mostrarDetalle(id) {
+  procesoSeleccionado = id;
+  const p = procesos.find(x=>x.id===id);
+  if (!p) return;
+  const col = avColor(p.empleado_id);
+  const ini = iniciales(p.empleado_nombre||'');
+  const check = p.checklist||{};
+  const total = CHECKLIST.length;
+  const done  = CHECKLIST.filter(c=>check[c.id]).length;
+  const pct   = Math.round((done/total)*100);
+  const ev    = p.entrevista||{};
+
+  document.getElementById('detalle-content').innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border-l)">
+      <div class="av av-xl" style="background:${col}">${ini}</div>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:600;margin-bottom:3px">${p.empleado_nombre}</div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:6px">${tipoBadge(p.tipo)} ${estadoBadge(p.estado)}</div>
+        <div style="font-size:12px;color:var(--text4)">Último día: <strong>${fmtFecha(p.fecha_salida)}</strong> · Resp.: ${p.responsable||'—'}</div>
+      </div>
+    </div>
+    <div style="margin-bottom:12px">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Avance del checklist</div>
+      <div class="prog-wrap"><div class="prog-bar ${pct===100?'done':''}" style="width:${pct}%"></div></div>
+      <div style="font-size:11px;color:var(--text3)">${done} de ${total} pasos completados</div>
+    </div>
+    ${p.observaciones?`<div style="background:#F8FAFC;border-radius:8px;padding:9px 12px;font-size:12px;color:var(--text3);margin-bottom:12px">${p.observaciones}</div>`:''}
+    <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.4px">Entrevista de salida</div>
+    ${PREGUNTAS.map(q=>`
+      <div style="padding:6px 0;border-bottom:1px solid var(--border-l)">
+        <div style="font-size:12px;color:var(--text3);margin-bottom:2px">${q.texto}</div>
+        <div style="font-size:13px;font-weight:500;color:var(--text2)">${ev[q.id]||<span style="color:var(--text4)">No respondido</span>}</div>
+      </div>`).join('')}
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+      <button class="btn btn-sm btn-primary" onclick="abrirChecklist(${id})"><i class="ti ti-checklist"></i>Gestionar checklist</button>
+      ${p.estado!=='Completado'?`<button class="btn btn-sm btn-warn" onclick="confirmarCompletadoDirecto(${id})"><i class="ti ti-circle-check"></i>Finalizar proceso</button>`:''}
+    </div>`;
+
+  renderTabla();
+}
+
+// ── MOTIVOS ──
+function renderMotivos() {
+  const wrap = document.getElementById('motivos-wrap');
+  if (!procesos.length) { wrap.innerHTML='<div style="text-align:center;padding:16px;color:var(--text4);font-size:13px">Sin datos</div>'; return; }
+  const freq = {};
+  procesos.forEach(p=>{ freq[p.tipo]=(freq[p.tipo]||0)+1; });
+  const total = procesos.length;
+  const COLORS = ['#3B82F6','#8B5CF6','#EC4899','#F59E0B','#10B981','#EF4444','#0EA5E9'];
+  wrap.innerHTML = Object.entries(freq).sort((a,b)=>b[1]-a[1]).map(([tipo,n],i)=>`
+    <div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+        <span style="color:var(--text2);font-weight:500">${tipo}</span>
+        <span style="color:var(--text3)">${n} (${Math.round(n/total*100)}%)</span>
+      </div>
+      <div class="prog-wrap">
+        <div style="width:${Math.round(n/total*100)}%;height:100%;border-radius:99px;background:${COLORS[i%COLORS.length]}"></div>
+      </div>
+    </div>`).join('');
+}
+
+// ── ENTREVISTA FORM ──
+function renderEntrevistaForm() {
+  document.getElementById('entrevista-preguntas').innerHTML = PREGUNTAS.map(q=>`
+    <div class="pregunta-item">
+      <div class="pregunta-lbl">${q.texto}</div>
+      <div class="pregunta-ctrl">
+        ${q.opciones.map(op=>`<div class="resp-btn" onclick="selRespuesta('${q.id}',this)">${op}</div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function selRespuesta(pregId, el) {
+  const wrap = el.closest('.pregunta-ctrl');
+  wrap.querySelectorAll('.resp-btn').forEach(b=>b.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+// ── SELECTS ──
+function llenarSelectEmpleado() {
+  const opts = empleados.map(e=>`<option value="${e.id}">${e.nombre} — ${e.cargo||''}</option>`).join('');
+  document.getElementById('f-empleado').innerHTML = opts;
+}
+
+// ── GUARDAR PROCESO ──
+async function guardar() {
+  const empId = Number(document.getElementById('f-empleado').value);
+  const fecha = document.getElementById('f-fecha').value;
+  const tipo  = document.getElementById('f-tipo').value;
+  if (!empId || !fecha) { toast('Empleado y fecha son obligatorios','err'); return; }
+
+  const emp = empleados.find(e=>e.id===empId);
+  const entrevista = {};
+  PREGUNTAS.forEach(q=>{
+    const sel = document.querySelector(`#entrevista-preguntas .resp-btn.selected[onclick*="'${q.id}'"]`);
+    if (sel) entrevista[q.id] = sel.textContent;
+  });
+
+  const datos = {
+    empleado_id: empId,
+    empleado_nombre: emp ? emp.nombre : '',
+    tipo,
+    fecha_salida: fecha,
+    estado: 'En proceso',
+    responsable: document.getElementById('f-responsable').value.trim()||null,
+    observaciones: document.getElementById('f-obs').value.trim()||null,
+    checklist: JSON.stringify({}),
+    entrevista: JSON.stringify(entrevista),
+  };
+
+  const btn = document.getElementById('btn-guardar');
+  btn.disabled = true;
+
+  if (esDemo()) {
+    procesos.unshift({id:Date.now(), ...datos, checklist:{}, entrevista});
+    toast(`Proceso iniciado para ${emp?emp.nombre:''} (demo)`,'ok');
+    renderizarTodo();
+    cerrarModal('modal-nuevo');
+    btn.disabled=false;
+    return;
+  }
+
+  const { error } = await db.from('procesos_salida').insert([datos]);
+  btn.disabled=false;
+  if (error) { toast('Error: '+error.message,'err'); return; }
+  toast(`Proceso de salida iniciado`,'ok');
+  cerrarModal('modal-nuevo');
+}
+
+// ── CHECKLIST ──
+let checkProcesoId = null;
+
+function abrirChecklist(id) {
+  const p = procesos.find(x=>x.id===id);
+  if (!p) return;
+  checkProcesoId = id;
+  document.getElementById('check-titulo').textContent = `Checklist — ${p.empleado_nombre}`;
+  renderChecklist(p);
+  abrirModal('modal-check');
+}
+
+function renderChecklist(p) {
+  const check = p.checklist||{};
+  const total = CHECKLIST.length;
+  const done  = CHECKLIST.filter(c=>check[c.id]).length;
+  const pct   = Math.round((done/total)*100);
+
+  document.getElementById('check-prog').style.width = pct+'%';
+  document.getElementById('check-prog').className = 'prog-bar'+(pct===100?' done':'');
+  document.getElementById('check-pct').textContent = `${done} de ${total} pasos completados`;
+  document.getElementById('btn-completar').style.display = (pct===100 && p.estado!=='Completado') ? 'inline-flex' : 'none';
+
+  let catActual = '';
+  document.getElementById('checklist-items').innerHTML = CHECKLIST.map(c=>{
+    const isDone = !!check[c.id];
+    let catHeader = '';
+    if (c.cat !== catActual) {
+      catActual = c.cat;
+      catHeader = `<div style="font-size:10px;font-weight:600;color:var(--text4);text-transform:uppercase;letter-spacing:.5px;padding:8px 0 4px;margin-top:${catActual===CHECKLIST[0].cat?0:4}px">${c.cat}</div>`;
+    }
+    return catHeader + `<div class="check-item${isDone?' done':''}" onclick="toggleCheck('${c.id}')">
+      <div class="ck-box"><i class="ti ti-check" style="font-size:11px"></i></div>
+      <span class="ck-lbl">${c.lbl}</span>
+    </div>`;
+  }).join('');
+}
+
+async function toggleCheck(pasoId) {
+  const p = procesos.find(x=>x.id===checkProcesoId);
+  if (!p || p.estado==='Completado') return;
+  const check = {...(p.checklist||{})};
+  check[pasoId] = !check[pasoId];
+  p.checklist = check;
+
+  if (!esDemo()) {
+    await db.from('procesos_salida').update({checklist: JSON.stringify(check)}).eq('id',p.id);
+  }
+
+  renderChecklist(p);
+  if (procesoSeleccionado===checkProcesoId) mostrarDetalle(checkProcesoId);
+  renderTabla();
+  actualizarStats();
+}
+
+function completarProceso() {
+  abrirModal('modal-confirm');
+}
+
+function confirmarCompletadoDirecto(id) {
+  checkProcesoId = id;
+  abrirModal('modal-confirm');
+}
+
+async function confirmarCompletado() {
+  const p = procesos.find(x=>x.id===checkProcesoId);
+  if (!p) return;
+  p.estado = 'Completado';
+
+  if (!esDemo()) {
+    await db.from('procesos_salida').update({estado:'Completado'}).eq('id',p.id);
+    // Marcar empleado como inactivo
+    await db.from('empleados').update({estado:'Inactivo'}).eq('id',p.empleado_id);
+  }
+
+  toast(`Proceso de ${p.empleado_nombre} finalizado`,'ok');
+  cerrarModal('modal-confirm');
+  cerrarModal('modal-check');
+  renderizarTodo();
+}
+
+// ── NUEVO PROCESO ──
+function abrirNuevo() {
+  document.getElementById('f-fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('f-obs').value='';
+  document.getElementById('f-responsable').value='Ana García';
+  document.querySelectorAll('.resp-btn').forEach(b=>b.classList.remove('selected'));
+  abrirModal('modal-nuevo');
+}
+
+// ── HELPERS ──
+function esDemo(){return SUPABASE_URL.includes('TU_PROYECTO');}
+function abrirModal(id){document.getElementById(id).classList.add('open');}
+function cerrarModal(id){document.getElementById(id).classList.remove('open');}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.querySelectorAll('.overlay').forEach(bg=>{
+    bg.addEventListener('click',e=>{if(e.target===bg)bg.classList.remove('open');});
+  });
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape') document.querySelectorAll('.overlay.open').forEach(m=>m.classList.remove('open'));
+});
+
+function toast(msg,tipo=''){
+  const wrap=document.getElementById('toast-wrap');
+  const el=document.createElement('div');
+  el.className=`toast ${tipo==='ok'?'ok':tipo==='err'?'err':''}`;
+  el.innerHTML=`<i class="ti ${tipo==='ok'?'ti-check':tipo==='err'?'ti-x':'ti-info-circle'}"></i>${msg}`;
+  wrap.appendChild(el);
+  setTimeout(()=>el.classList.add('show'),10);
+  setTimeout(()=>{el.classList.remove('show');setTimeout(()=>el.remove(),300);},3000);
+}
+
+// ── ARRANCAR ──
+iniciar();
+</script>
+</body>
+</html>
