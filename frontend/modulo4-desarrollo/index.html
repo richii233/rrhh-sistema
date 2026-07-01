@@ -1,0 +1,470 @@
+<script type="module">
+// ── SUPABASE ──
+import { supabase as db } from '../supabase-client.js';
+
+// ── ESTADO GENERAL ──
+let empleados = [];
+let capacitaciones = [];
+let evaluaciones = [];
+let filtroDepto = 'todos';
+let empleadoSeleccionado = null;
+let histTab = 'cap';
+let modoDemoActivo = false;
+
+// ── HELPERS GENERALES ──
+const AV_COLORS = ['#8B5CF6','#3B82F6','#EC4899','#0EA5E9','#10B981','#F59E0B','#6366F1','#14B8A6','#EF4444','#F97316'];
+function avColor(id) { return AV_COLORS[(id||0) % AV_COLORS.length]; }
+function iniciales(nombre) { return (nombre||'??').split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase(); }
+function fmtFecha(iso) { if(!iso) return '—'; const d=new Date(iso+'T12:00:00'); return d.toLocaleDateString('es',{day:'2-digit',month:'short',year:'numeric'}); }
+function diasHasta(iso){ if(!iso) return null; const hoy=new Date(); const d=new Date(iso+'T12:00:00'); return Math.round((d-hoy)/86400000); }
+function estrellas(prom){ const n=Math.round(prom||0); return '★'.repeat(n)+'☆'.repeat(5-n); }
+
+function capBadge(e) {
+  const m = {Inscrito:'b-blue',['En curso']:'b-yellow',Completado:'b-green',['No completado']:'b-red'};
+  return `<span class="badge ${m[e]||'b-gray'}">${e}</span>`;
+}
+
+// ── RATINGS DEL MODAL ──
+function actualizarRating(id) {
+  const el = document.getElementById(id);
+  if(!el) return;
+  const v = parseFloat(el.value);
+  const numEl = document.getElementById('rv-'+id.split('-')[1]);
+  if(numEl) numEl.textContent = v.toFixed(1);
+  recalcPromedio();
+}
+
+function recalcPromedio() {
+  const ids = ['r-punt','r-equipo','r-result','r-lider'];
+  const vals = ids.map(id => {
+    const el = document.getElementById(id);
+    return el ? parseFloat(el.value) : 4;
+  });
+  const prom = vals.reduce((a,b)=>a+b,0)/vals.length;
+  const promEl = document.getElementById('eval-promedio');
+  if(promEl) promEl.textContent = prom.toFixed(2);
+}
+
+// ── FILTROS DEPTO ──
+function renderFiltrosDeptoLimpio() {
+  const deptos = [...new Set(empleados.map(e=>e.departamento).filter(Boolean))];
+  const row = document.querySelector('.filter-row');
+  if(row) {
+    row.innerHTML = `<span class="filter-lbl">Departamento:</span>
+      <div class="chip ${filtroDepto==='todos'?'active':''}" onclick="filtrarPor('todos',this)">Todos</div>
+      ${deptos.map(d=>`<div class="chip ${filtroDepto===d?'active':''}" onclick="filtrarPor('${d.replace(/'/g,"\\'")}',this)">${d}</div>`).join('')}`;
+  }
+}
+
+function filtrarPor(depto, el) {
+  filtroDepto = depto;
+  renderFiltrosDeptoLimpio();
+  renderTabla();
+}
+
+// ── TABLA ──
+function renderTabla() {
+  const sInp = document.getElementById('search-input');
+  const busqueda = (sInp ? sInp.value : '').toLowerCase();
+  const lista = empleados.filter(e => {
+    const matchD = filtroDepto==='todos' || e.departamento===filtroDepto;
+    const matchB = !busqueda || (e.nombre||'').toLowerCase().includes(busqueda) || (e.cargo||'').toLowerCase().includes(busqueda);
+    return matchD && matchB;
+  });
+
+  const tbody = document.getElementById('tbody');
+  if(!tbody) return;
+  
+  if (!lista.length) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="4"><i class="ti ti-users-off" style="font-size:24px;display:block;margin:0 auto 8px;color:#CBD5E1"></i>Sin empleados</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = lista.map(e => {
+    const ini = iniciales(e.nombre);
+    const col = avColor(e.id);
+    const prom = promedioEmpleado(e.id);
+    const capCount = capacitaciones.filter(c=>c.empleado_id===e.id).length;
+    const capComp = capacitaciones.filter(c=>c.empleado_id===e.id && c.estado==='Completado').length;
+    return `<tr onclick="mostrarPerfil(${e.id})" style="cursor:pointer;${empleadoSeleccionado===e.id?'background:#EFF6FF':''}">
+      <td>
+        <div style="display:flex;align-items:center;gap:9px">
+          <div class="av" style="background:${col}">${ini}</div>
+          <div>
+            <div style="font-weight:500;font-size:13px">${e.nombre}</div>
+            <div style="font-size:11px;color:var(--text4)">${e.cargo||'—'}</div>
+          </div>
+        </div>
+      </td>
+      <td>${prom!==null ? `<span class="stars">${estrellas(prom)}</span> <span style="font-size:12px;color:var(--text3)">${prom.toFixed(2)}</span>` : '<span style="color:var(--text4)">Sin evaluar</span>'}</td>
+      <td>${capComp}/${capCount} completadas</td>
+      <td><button class="btn btn-sm" onclick="event.stopPropagation();mostrarPerfil(${e.id})"><i class="ti ti-eye"></i></button></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── PERFIL ──
+function mostrarPerfil(id) {
+  empleadoSeleccionado = id;
+  const e = empleados.find(x=>x.id===id);
+  if (!e) return;
+  const ini = iniciales(e.nombre);
+  const col = avColor(e.id);
+  const prom = promedioEmpleado(e.id);
+  const cap = capacitaciones.filter(c=>c.empleado_id===id).sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+  const evs = evaluaciones.filter(c=>c.empleado_id===id).sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+
+  const pBox = document.getElementById('perfil-content');
+  if(pBox) {
+    pBox.innerHTML = `
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border-l)">
+        <div class="av av-xl" style="background:${col}">${ini}</div>
+        <div>
+          <div style="font-size:16px;font-weight:600;margin-bottom:3px">${e.nombre}</div>
+          <div style="font-size:12px;color:var(--text3);margin-bottom:7px">${e.cargo||'—'} · Depto. ${e.departamento||'—'}</div>
+          ${prom!==null ? `<span class="stars">${estrellas(prom)}</span> <span style="font-size:12px;font-weight:600;color:var(--text)">${prom.toFixed(2)}/5</span>` : '<span class="badge b-gray">Sin evaluaciones</span>'}
+        </div>
+      </div>
+      <div class="tabs">
+        <div class="tab ${histTab==='cap'?'active':''}" onclick="tabHist('cap',this)">Capacitaciones (${cap.length})</div>
+        <div class="tab ${histTab==='eval'?'active':''}" onclick="tabHist('eval',this)">Evaluaciones (${evs.length})</div>
+      </div>
+      <div id="hist-content">${renderHistContent(histTab, cap, evs)}</div>
+      <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+        <button class="btn btn-sm btn-blue-o" onclick="abrirCapacitacion(${id})"><i class="ti ti-certificate"></i>Nueva capacitación</button>
+        <button class="btn btn-sm btn-primary" onclick="abrirEvaluacion(${id})"><i class="ti ti-star"></i>Nueva evaluación</button>
+      </div>`;
+  }
+
+  renderTabla();
+}
+
+function tabHist(tab, el) {
+  histTab = tab;
+  document.querySelectorAll('.tabs .tab').forEach(t=>t.classList.remove('active'));
+  if(el) el.classList.add('active');
+  const cap = capacitaciones.filter(c=>c.empleado_id===empleadoSeleccionado).sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+  const evs = evaluaciones.filter(c=>c.empleado_id===empleadoSeleccionado).sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+  const hContent = document.getElementById('hist-content');
+  if(hContent) hContent.innerHTML = renderHistContent(tab, cap, evs);
+}
+
+function renderHistContent(tab, cap, evs) {
+  if (tab==='cap') {
+    if (!cap.length) return `<div style="text-align:center;padding:20px;color:var(--text4);font-size:13px">Sin capacitaciones registradas</div>`;
+    return cap.map(c=>`
+      <div class="hist-item">
+        <div class="hist-icon" style="background:#EFF6FF;color:#2563EB"><i class="ti ti-certificate"></i></div>
+        <div style="flex:1">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-weight:500;color:var(--text2)">${c.nombre}</span>
+            ${capBadge(c.estado)}
+          </div>
+          <div style="color:var(--text4);margin-top:2px">${fmtFecha(c.fecha)} · ${c.horas||0}h${c.proveedor?` · ${c.proveedor}`:''}</div>
+        </div>
+      </div>`).join('');
+  }
+  if (!evs.length) return `<div style="text-align:center;padding:20px;color:var(--text4);font-size:13px">Sin evaluaciones registradas</div>`;
+  return evs.map(e=>`
+    <div class="hist-item">
+      <div class="hist-icon" style="background:#FFFBEB;color:#D97706"><i class="ti ti-star"></i></div>
+      <div style="flex:1">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:500;color:var(--text2)">Promedio: ${Number(e.promedio).toFixed(2)}/5</span>
+          <span style="color:var(--text4)">${fmtFecha(e.fecha)}</span>
+        </div>
+        <div style="color:var(--text4);margin-top:2px">Puntualidad ${e.puntualidad} · Equipo ${e.trabajo_equipo} · Resultados ${e.resultados} · Liderazgo ${e.liderazgo}</div>
+        ${e.descripcion?`<div style="color:var(--text3);margin-top:3px;font-style:italic">"${e.descripcion}"</div>`:''}
+      </div>
+    </div>`).join('');
+}
+
+// ── VENCIMIENTOS ──
+function renderVencimientos() {
+  const wrap = document.getElementById('venc-wrap');
+  if(!wrap) return;
+  
+  const prox = capacitaciones
+    .filter(c=>c.fecha_vencimiento || c.vencimiento)
+    .map(c=>({...c, dias: diasHasta(c.fecha_vencimiento||c.vencimiento)}))
+    .filter(c=>c.dias!==null && c.dias>=0 && c.dias<=60)
+    .sort((a,b)=>a.dias-b.dias);
+
+  if (!prox.length) {
+    wrap.innerHTML = `<div style="text-align:center;padding:14px;color:var(--text4);font-size:13px">Sin certificaciones por vencer</div>`;
+    return;
+  }
+  wrap.innerHTML = prox.map(c=>{
+    const emp = empleados.find(e=>e.id===c.empleado_id);
+    return `<div class="hist-item">
+      <div class="hist-icon" style="background:#FEF2F2;color:#B91C1C"><i class="ti ti-alert-triangle"></i></div>
+      <div>
+        <div style="font-weight:500;color:var(--text2)">${c.nombre} — ${emp?emp.nombre:'—'}</div>
+        <div style="color:var(--text4);margin-top:2px">Vence en ${c.dias} día${c.dias===1?'':'s'} · ${fmtFecha(c.fecha_vencimiento||c.vencimiento)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── SELECTS ──
+function llenarSelectsEmpleado() {
+  const opts = empleados.map(e=>`<option value="${e.id}">${e.nombre} — ${e.cargo||''}</option>`).join('');
+  const sCap = document.getElementById('cap-empleado');
+  const sEval = document.getElementById('eval-empleado');
+  if(sCap) sCap.innerHTML = opts;
+  if(sEval) sEval.innerHTML = opts;
+}
+
+// ── MODAL CAPACITACIÓN ──
+function abrirCapacitacion(empId) {
+  try {
+    document.getElementById('cap-nombre').value='';
+    document.getElementById('cap-proveedor').value='';
+    document.getElementById('cap-horas').value='';
+    document.getElementById('cap-vencimiento').value='';
+    document.getElementById('cap-estado').value='Completado';
+    document.getElementById('cap-fecha').value = new Date().toISOString().split('T')[0];
+    if (empId) document.getElementById('cap-empleado').value = empId;
+  } catch(e){}
+  abrirModal('modal-cap');
+}
+
+async function guardarCapacitacion() {
+  const empId = Number(document.getElementById('cap-empleado').value);
+  const nombre = document.getElementById('cap-nombre').value.trim();
+  if (!empId || !nombre) { toast('Completa empleado y nombre de la capacitación','err'); return; }
+
+  const datos = {
+    empleado_id: empId,
+    nombre,
+    fecha: document.getElementById('cap-fecha').value || null,
+    horas: parseInt(document.getElementById('cap-horas').value) || null,
+    proveedor: document.getElementById('cap-proveedor').value.trim() || null,
+    estado: document.getElementById('cap-estado').value,
+    fecha_vencimiento: document.getElementById('cap-vencimiento').value || null,
+  };
+
+  const btn = document.getElementById('btn-cap-guardar');
+  if(btn) btn.disabled = true;
+
+  if (esDemo()) {
+    capacitaciones.unshift({id:Date.now(), ...datos});
+    toast(`Capacitación registrada (demo)`,'ok');
+    renderizarTodo();
+    cerrarModal('modal-cap');
+    if(btn) btn.disabled=false;
+    return;
+  }
+
+  const { error } = await db.from('capacitaciones_empleado').insert([datos]);
+  if(btn) btn.disabled = false;
+  if (error) { toast('Error: '+error.message,'err'); return; }
+  toast('Capacitación registrada','ok');
+  cerrarModal('modal-cap');
+  await cargar();
+}
+
+// ── MODAL EVALUACIÓN ──
+function abrirEvaluacion(empId) {
+  try {
+    ['r-punt','r-equipo','r-result','r-lider'].forEach(id=>{
+      const el = document.getElementById(id);
+      if(el) el.value = 4;
+      actualizarRating(id);
+    });
+    document.getElementById('eval-desc').value='';
+    document.getElementById('eval-fecha').value = new Date().toISOString().split('T')[0];
+    if (empId) document.getElementById('eval-empleado').value = empId;
+  } catch(e){}
+  abrirModal('modal-eval');
+}
+
+async function guardarEvaluacion() {
+  const empId = Number(document.getElementById('eval-empleado').value);
+  if (!empId) { toast('Selecciona un empleado','err'); return; }
+
+  const punt = parseFloat(document.getElementById('r-punt').value);
+  const equipo = parseFloat(document.getElementById('r-equipo').value);
+  const result = parseFloat(document.getElementById('r-result').value);
+  const lider = parseFloat(document.getElementById('r-lider').value);
+  const promedio = (punt+equipo+result+lider)/4;
+
+  const datos = {
+    empleado_id: empId,
+    fecha: document.getElementById('eval-fecha').value || new Date().toISOString().split('T')[0],
+    puntualidad: punt, trabajo_equipo: equipo, resultados: result, liderazgo: lider,
+    descripcion: document.getElementById('eval-desc').value.trim() || null,
+    evaluador: document.getElementById('eval-evaluador').value.trim() || null,
+  };
+
+  const btn = document.getElementById('btn-eval-guardar');
+  if(btn) btn.disabled = true;
+
+  if (esDemo()) {
+    evaluaciones.unshift({id:Date.now(), ...datos, promedio});
+    toast('Evaluación registrada (demo)','ok');
+    renderizarTodo();
+    cerrarModal('modal-eval');
+    if(btn) btn.disabled=false;
+    return;
+  }
+
+  const { error } = await db.from('evaluaciones_empleado').insert([datos]);
+  if(btn) btn.disabled = false;
+  if (error) { toast('Error: '+error.message,'err'); return; }
+  toast('Evaluación registrada','ok');
+  cerrarModal('modal-eval');
+  await cargar();
+}
+
+function promedioEmpleado(id) {
+  const evs = evaluaciones.filter(e=>e.empleado_id===id);
+  if (!evs.length) return null;
+  return evs.reduce((a,e)=>a+Number(e.promedio||0),0)/evs.length;
+}
+
+function esDemo(){ 
+  return modoDemoActivo; 
+}
+
+function abrirModal(id){
+  const el = document.getElementById(id);
+  if(el) el.classList.add('open');
+}
+function cerrarModal(id){
+  const el = document.getElementById(id);
+  if(el) el.classList.remove('open');
+}
+
+// ── INICIO CON CAPTURA CRÍTICA DE ERRORES ──
+async function iniciar() {
+  try {
+    const dCap = document.getElementById('cap-fecha');
+    const dEval = document.getElementById('eval-fecha');
+    if(dCap) dCap.value = new Date().toISOString().split('T')[0];
+    if(dEval) dEval.value = new Date().toISOString().split('T')[0];
+  } catch(e) {}
+
+  const dot = document.getElementById('sdot');
+  const txt = document.getElementById('stxt');
+  const st  = document.getElementById('db-status');
+
+  try {
+    if (!db) throw new Error("Cliente de Supabase no inicializado");
+    
+    const { data, error } = await db.from('empleados').select('id').limit(1);
+    if (error) throw error;
+    
+    if(dot) dot.style.background = '#22C55E';
+    if(txt) txt.textContent = 'Conectado a Supabase';
+    if(st) setTimeout(()=>st.classList.add('hidden'),2000);
+    
+    await cargar();
+    suscribirRealtime();
+  } catch (err) {
+    console.error("Fallo de conexión o base de datos vacía, activando fallback demo:", err);
+    modoDemoActivo = true;
+    if(dot) dot.style.background = '#F59E0B';
+    if(txt) txt.textContent = 'Modo demo — Fallback activo';
+    if(st) setTimeout(()=>st.classList.add('hidden'),4000);
+    cargarDatosDemo();
+    renderizarTodo();
+  }
+}
+
+async function cargar() {
+  try {
+    const [e, c, ev] = await Promise.all([
+      db.from('empleados').select('*'),
+      db.from('capacitaciones_empleado').select('*').order('fecha',{ascending:false}),
+      db.from('evaluaciones_empleado').select('*').order('fecha',{ascending:false}),
+    ]);
+    
+    empleados = e.data || [];
+    capacitaciones = c.data || [];
+    evaluaciones = ev.data || [];
+    
+    if(empleados.length === 0) {
+      cargarDatosDemo();
+    }
+    
+    renderizarTodo();
+  } catch(err) {
+    console.error("Error cargando colecciones:", err);
+    modoDemoActivo = true;
+    cargarDatosDemo();
+    renderizarTodo();
+  }
+}
+
+function suscribirRealtime() {
+  if(!db) return;
+  db.channel('desarrollo')
+    .on('postgres_changes',{event:'*',schema:'public',table:'capacitaciones_empleado'}, ()=>cargar())
+    .on('postgres_changes',{event:'*',schema:'public',table:'evaluaciones_empleado'}, ()=>cargar())
+    .subscribe();
+}
+
+// ── DATOS DEMO ──
+function cargarDatosDemo() {
+  empleados = [
+    {id:1,nombre:'Ana García',cargo:'Gerente RRHH',departamento:'RRHH',estado:'Activo'},
+    {id:2,nombre:'Carlos Mora',cargo:'Analista TI',departamento:'TI',estado:'Activo'},
+    {id:3,nombre:'Lucía Pérez',cargo:'Diseñadora',departamento:'Marketing',estado:'Activo'},
+    {id:4,nombre:'Roberto Sánchez',cargo:'Dev Backend',departamento:'TI',estado:'Activo'},
+    {id:5,nombre:'María Jiménez',cargo:'Contadora',departamento:'Finanzas',estado:'Activo'},
+    {id:6,nombre:'Diego Vargas',cargo:'Vendedor',departamento:'Comercial',estado:'Activo'},
+    {id:7,nombre:'Patricia López',cargo:'Asistente RRHH',departamento:'RRHH',estado:'Activo'},
+    {id:8,nombre:'Fernando Ruiz',cargo:'Supervisor',departamento:'Operaciones',estado:'Activo'},
+  ];
+  capacitaciones = [
+    {id:1,empleado_id:4,nombre:'Seguridad Industrial',fecha:'2026-03-15',horas:8,proveedor:'Instituto Nacional',estado:'Completado'},
+    {id:2,empleado_id:4,nombre:'Excel Avanzado',fecha:'2026-01-10',horas:16,proveedor:'Capacita Panamá',estado:'Completado'},
+    {id:3,empleado_id:2,nombre:'Ciberseguridad',fecha:'2026-02-20',horas:24,proveedor:'ISACA',estado:'Completado'},
+    {id:4,empleado_id:2,nombre:'AWS Cloud Practitioner',fecha:'2026-06-10',horas:12,proveedor:'AWS Academy',estado:'En curso'},
+    {id:5,empleado_id:6,nombre:'Técnicas de Venta Consultiva',fecha:'2026-05-02',horas:6,proveedor:'Capacita Panamá',estado:'Inscrito'},
+    {id:6,empleado_id:3,nombre:'Adobe Creative Cloud',fecha:'2025-11-20',horas:10,proveedor:'Adobe',estado:'Completado'},
+  ];
+  evaluaciones = [
+    {id:1,empleado_id:4,fecha:'2026-04-01',puntualidad:4.5,trabajo_equipo:4.0,resultados:4.2,liderazgo:4.0,promedio:4.18,descripcion:'Buen desempeño técnico',evaluador:'Ana García'},
+    {id:2,empleado_id:4,fecha:'2025-12-01',puntualidad:4.0,trabajo_equipo:3.8,resultados:4.0,liderazgo:3.8,promedio:3.90,descripcion:null,evaluador:'Ana García'},
+    {id:3,empleado_id:2,fecha:'2026-04-01',puntualidad:4.8,trabajo_equipo:4.5,resultados:4.3,liderazgo:4.0,promedio:4.40,descripcion:'Excelente proactividad',evaluador:'Ana García'},
+    {id:4,empleado_id:6,fecha:'2026-03-15',puntualidad:3.5,trabajo_equipo:4.0,resultados:3.8,liderazgo:3.0,promedio:3.58,descripcion:null,evaluador:'Ana García'},
+  ];
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.querySelectorAll('.overlay').forEach(bg=>{
+    bg.addEventListener('click',e=>{if(e.target===bg)bg.classList.remove('open');});
+  });
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape') document.querySelectorAll('.overlay.open').forEach(m=>m.classList.remove('open'));
+});
+
+function toast(msg,tipo=''){
+  const wrap=document.getElementById('toast-wrap');
+  if(!wrap) return;
+  const el=document.createElement('div');
+  el.className=`toast ${tipo==='ok'?'ok':tipo==='err'?'err':''}`;
+  el.innerHTML=`<i class="ti ${tipo==='ok'?'ti-check':tipo==='err'?'ti-x':'ti-info-circle'}"></i>${msg}`;
+  wrap.appendChild(el);
+  setTimeout(()=>el.classList.add('show'),10);
+  setTimeout(()=>{el.classList.remove('show');setTimeout(()=>el.remove(),300);},3000);
+}
+
+// ── REGISTRO SEGURO EN EL OBJETO WINDOW (Resuelve el orden de lectura) ──
+window.renderTabla = renderTabla;
+window.abrirCapacitacion = abrirCapacitacion;
+window.guardarCapacitacion = guardarCapacitacion;
+window.abrirEvaluacion = abrirEvaluacion;
+window.guardarEvaluacion = guardarEvaluacion;
+window.cerrarModal = cerrarModal;
+window.filtrarPor = filtrarPor;
+window.mostrarPerfil = mostrarPerfil;
+window.tabHist = tabHist;
+window.actualizarRating = actualizarRating;
+
+// ── ARRANCAR ──
+iniciar();
+</script>
